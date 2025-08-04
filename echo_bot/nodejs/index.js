@@ -1,5 +1,5 @@
 import * as Lark from '@larksuiteoapi/node-sdk';
-import { getMovieDialogue, getTianGouContent, getZhaNanContent } from './API/utils.js';
+import { getMovieDialogue, getTianGouContent, getZhaNanContent, getfenfangContent } from './API/utils.js';
 
 /**
  * 配置应用基础信息和请求域名。
@@ -106,6 +106,12 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
       return `获取渣男语录失败`;
     });
 
+    // 调用芬芳API
+    const getFenfang = () => getfenfangContent().catch(error => {
+      console.error("芬芳错误:", error);
+      return `获取芬芳失败`;
+    });
+
     if (chat_type === 'p2p') {
       /**
        * 使用SDK调用发送消息接口。 Use SDK to call send message interface.
@@ -121,8 +127,10 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
         contentText = await getTiangou();
       } else if (responseText.includes('渣一下')) {
         contentText = await getZhanan();
+      } else if (responseText.includes('骂一下')) {
+        contentText = await getFenfang();
       } else {
-        console.log('没输入');
+        console.log('没输对，输入内容为：', responseText);
         return;
       }
       
@@ -160,8 +168,10 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
       } else if (responseText.includes('渣一下')) {
         contentText = await getZhanan();
         console.log('contentText =', contentText);
+      } else if (responseText.includes('骂一下')) {
+        contentText = await getFenfang();
       } else {
-        console.log('没输入');
+        console.log('没输对，输入内容为：', responseText);
         return;
       }
 
