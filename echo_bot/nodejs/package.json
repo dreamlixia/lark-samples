@@ -10,6 +10,8 @@
   },
   "dependencies": {
     "@larksuiteoapi/node-sdk": "^1.40.0",
+    "dotenv": "^17.2.1",
+    "openai": "^5.16.0",
     "request": "*"
   }
 }

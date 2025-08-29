@@ -1,5 +1,10 @@
+import 'dotenv/config'; 
 import * as Lark from '@larksuiteoapi/node-sdk';
 import { getMovieDialogue, getTianGouContent, getZhaNanContent, getfenfangContent } from './API/utils.js';
+// import { getLLMApiContent } from './API/LLM/doubao_seed.js';
+import { getDSLLMApiContent } from './API/LLM/ds3.1.js';
+
+// console.log("读取到的 KEY:", process.env.ARK_API_KEY);
 
 /**
  * 配置应用基础信息和请求域名。
@@ -21,6 +26,9 @@ const baseConfig = {
 const client = new Lark.Client(baseConfig);
 const wsClient = new Lark.WSClient(baseConfig);
 
+// 用来记录处理过的事件
+const processedEvents = new Set();
+
 /**
  * 注册事件处理器。
  * Register event handler.
@@ -35,7 +43,23 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
     const {
       message: { chat_id, content, mentions, message_type, chat_type },
       sender: { sender_id },
+      // header: { event_id },
+      event_id,
     } = data;
+
+    if (!event_id) {
+      console.log("没有拿到 event_id:", data);
+      return;
+    }
+
+    console.log('event_id =', event_id);
+
+    if (processedEvents.has(event_id)) {
+      console.log("重复事件，忽略:", event_id);
+      return;
+    }
+
+    processedEvents.add(event_id);
 
     /**
      * 解析用户发送的消息。
@@ -54,7 +78,7 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
         user_open_id = sender_id.open_id || '';
 
         atUser = `<at user_id="${user_open_id}">${user_name}</at>`;
-      } 
+      }
     } else if (chat_type === 'group') {
       console.log('group data =', JSON.stringify(data));
       console.log('mentions =', mentions);
@@ -112,12 +136,17 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
       return `获取芬芳失败`;
     });
 
+    // 调用大模型API
+    const getLLMApi = (responseText) => getDSLLMApiContent(responseText).catch(error => {
+      return `获取LLM失败`
+    });
+
     if (chat_type === 'p2p') {
       /**
        * 使用SDK调用发送消息接口。 Use SDK to call send message interface.
        * https://open.feishu.cn/document/uAjLw4CM/ukTMukTMukTM/reference/im-v1/message/create
        */
-      console.log('responseText =', responseText);
+      console.log('单聊 responseText =', responseText);
 
       let contentText = '';
   
@@ -130,8 +159,31 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
       } else if (responseText.includes('骂一下')) {
         contentText = await getFenfang();
       } else {
-        console.log('没输对，输入内容为：', responseText);
-        return;
+        console.log('单聊 没输对，输入内容为：', responseText);
+        // return;
+        // 这里预计调用大模型
+        // 先回一条占位消息
+        await client.im.v1.message.create({
+          params: { receive_id_type: 'chat_id' },
+          data: {
+            receive_id: chat_id,
+            msg_type: "text",
+            content: JSON.stringify({ text: "请稍等……" }),
+          },
+        });
+        // 调用大模型
+        const answer = await getLLMApi(responseText);
+
+        // 再回最终消息
+        await client.im.v1.message.create({
+          params: { receive_id_type: 'chat_id' },
+          data: {
+            receive_id: chat_id,
+            msg_type: "text",
+            content: JSON.stringify({ text: user_open_id ? `${atUser} ${answer}` : answer }),
+          },
+        });
+
       }
       
       // 构建消息对象
@@ -157,7 +209,7 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
        * https://open.feishu.cn/document/server-docs/im-v1/message/reply
        */
 
-      console.log('responseText =', responseText);
+      console.log('群聊 responseText =', responseText);
 
       let contentText = '';
   
@@ -171,8 +223,29 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
       } else if (responseText.includes('骂一下')) {
         contentText = await getFenfang();
       } else {
-        console.log('没输对，输入内容为：', responseText);
-        return;
+        console.log('群聊 没输对，输入内容为：', responseText);
+        // return;
+        // 先回一条占位消息
+        await client.im.v1.message.create({
+          params: { receive_id_type: 'chat_id' },
+          data: {
+            receive_id: chat_id,
+            msg_type: "text",
+            content: JSON.stringify({ text: "请稍等……" }),
+          },
+        });
+        // 调用大模型
+        const answer = await getLLMApi(responseText);
+
+        // 再回最终消息
+        await client.im.v1.message.create({
+          params: { receive_id_type: 'chat_id' },
+          data: {
+            receive_id: chat_id,
+            msg_type: "text",
+            content: JSON.stringify({ text: answer }),
+          },
+        });
       }
 
       console.log('group atUser =', `${atUser} ${contentText}`);

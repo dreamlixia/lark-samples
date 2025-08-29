@@ -14,3 +14,22 @@
 macOS/Linux： `APP_ID=<app_id> APP_SECRET=<app_secret> ./bootstrap.sh`
 
 Windows： `set APP_ID=<app_id>&set APP_SECRET=<app_secret>&bootstrap.bat`
+
+
+
+# 我是工具人启动命令
+
+```
+@dreamlixia ➜ /workspaces/lark-samples (main) $
+
+(cd echo_bot/nodejs && BASE_DOMAIN=https://open.larkoffice.com APP_ID=cli_a8d8341d4cba101c APP_SECRET=khtvgD2KONtzyrN8l12DceelcfkXE3Bf  ./bootstrap.sh)
+```
+
+# 我是工具人代码位置
+
+```
+echo_bot/nodejs/index.js
+```
+
+# 工具地址：
+https://open.larkoffice.com/app/cli_a8d8341d4cba101c/baseinfo

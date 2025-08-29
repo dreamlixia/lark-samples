@@ -126,3 +126,13 @@ export const getfenfangContent = async () => {
     return "获取芬芳失败，请稍后重试";
   }
 } 
+
+// LLM
+export const getLLMApiContent = async () => {
+  try {
+    
+  } catch (error) {
+    console.error("请求失败:", error);
+    return "调用LLM失败，请稍后重试";
+  }
+}
