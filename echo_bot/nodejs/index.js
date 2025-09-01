@@ -2,7 +2,7 @@ import 'dotenv/config';
 import * as Lark from '@larksuiteoapi/node-sdk';
 import { getMovieDialogue, getTianGouContent, getZhaNanContent, getfenfangContent } from './API/utils.js';
 // import { getLLMApiContent } from './API/LLM/doubao_seed.js';
-import { getDSLLMApiContent } from './API/LLM/ds3.1.js';
+import { getDSLLMApiContent } from './API/LLM/deepseek3.1.js';
 
 // console.log("读取到的 KEY:", process.env.ARK_API_KEY);
 
@@ -43,16 +43,15 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
     const {
       message: { chat_id, content, mentions, message_type, chat_type },
       sender: { sender_id },
-      // header: { event_id },
       event_id,
     } = data;
 
+    console.log('data =', data);
+
     if (!event_id) {
-      console.log("没有拿到 event_id:", data);
+      // console.log("没有拿到 event_id:", data);
       return;
     }
-
-    console.log('event_id =', event_id);
 
     if (processedEvents.has(event_id)) {
       console.log("重复事件，忽略:", event_id);
@@ -66,8 +65,6 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
      * Parse the message sent by the user.
      */
 
-    // console.log('data =', JSON.stringify(data));
-
     let user_open_id = '';
     let user_name = '';
     let atUser = '';
@@ -80,19 +77,18 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
         atUser = `<at user_id="${user_open_id}">${user_name}</at>`;
       }
     } else if (chat_type === 'group') {
-      console.log('group data =', JSON.stringify(data));
-      console.log('mentions =', mentions);
       // 群聊获取用户open_id
       if(mentions?.length > 0) {
         let user_info_list = mentions?.filter(item => item.name !== "我是工具人");
-        console.log('user_info_list =', user_info_list);
         user_open_id = user_info_list.map(item => item?.id?.open_id || '');
-        // user_open_id = user_info?.id?.open_id || '';
-        // console.log('user_open_id =', user_open_id);
-        // user_name = user_info?.name || '';
 
-        atUser = user_info_list?.map(item => `<at user_id="${item?.id?.open_id}">${item?.name}</at>`)?.join(' ');
-        console.log('atUser =', atUser);
+        if (user_info_list?.length) {
+          atUser = user_info_list?.map(item => `<at user_id="${item?.id?.open_id}">${item?.name}</at>`)?.join(' ');
+        } else {
+          user_open_id = sender_id.open_id || '';
+          atUser = `<at user_id="${user_open_id}">${user_name}</at>`;
+        }
+
       }
     }
 
@@ -159,7 +155,7 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
       } else if (responseText.includes('骂一下')) {
         contentText = await getFenfang();
       } else {
-        console.log('单聊 没输对，输入内容为：', responseText);
+        console.log('source单聊，非固定格式调用，输入内容为：', responseText);
         // return;
         // 这里预计调用大模型
         // 先回一条占位消息
@@ -192,7 +188,6 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
         msg_type: "text",
         content: JSON.stringify({
           text: user_open_id ? `${atUser} ${contentText}` : contentText
-          // text: user_open_id ? `<at user_id="${user_open_id}">${user_name}</at> ${contentText}` : contentText
         }),
       };
 
@@ -223,7 +218,7 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
       } else if (responseText.includes('骂一下')) {
         contentText = await getFenfang();
       } else {
-        console.log('群聊 没输对，输入内容为：', responseText);
+        console.log('source:群聊，非固定格式调用，输入内容为：', responseText);
         // return;
         // 先回一条占位消息
         await client.im.v1.message.create({
@@ -248,15 +243,12 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
         });
       }
 
-      console.log('group atUser =', `${atUser} ${contentText}`);
-
       // 构建消息对象
       const data_message = {
         receive_id: user_open_id,
         msg_type: "text",
         content: JSON.stringify({
           text: user_open_id ? `${atUser} ${contentText}` : contentText
-          // text: user_open_id ? `<at user_id="${user_open_id}">${user_name}</at> ${contentText}` : contentText
         }),
         // uuid: "a0d69e20-1dd1-458b-k525-dfeca4015204" // 实际使用时需更换
       };
