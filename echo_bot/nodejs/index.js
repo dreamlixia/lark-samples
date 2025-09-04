@@ -4,6 +4,20 @@ import { getMovieDialogue, getTianGouContent, getZhaNanContent, getfenfangConten
 // import { getLLMApiContent } from './API/LLM/doubao_seed.js';
 import { getDSLLMApiContent } from './API/LLM/deepseek3.1.js';
 
+/**
+ * {
+    id: {
+      open_id: 'ou_054cd5c14c4003fc447882c946a18dc3',
+      union_id: 'on_66800d6221af6cca86366d81e87de41b',
+      user_id: null
+    },
+    key: '@_user_1',
+    name: '我是工具人',
+    tenant_key: '736588c9260f175d'
+  },
+ */
+const TOOL_BOT_OPEN_ID = 'ou_054cd5c14c4003fc447882c946a18dc3';
+
 // console.log("读取到的 KEY:", process.env.ARK_API_KEY);
 
 /**
@@ -46,7 +60,7 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
       event_id,
     } = data;
 
-    console.log('data =', data);
+    // console.log('data =', data, 'stringify =', JSON.stringify(data), 'mentions =', mentions);
 
     if (!event_id) {
       // console.log("没有拿到 event_id:", data);
@@ -79,8 +93,14 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
     } else if (chat_type === 'group') {
       // 群聊获取用户open_id
       if(mentions?.length > 0) {
+
+        if(mentions?.filter(item => item.name === "我是工具人")?.length === 0) {
+          return;
+        }
+
         let user_info_list = mentions?.filter(item => item.name !== "我是工具人");
-        user_open_id = user_info_list.map(item => item?.id?.open_id || '');
+
+        user_open_id = user_info_list?.map(item => item?.id?.open_id || '');
 
         if (user_info_list?.length) {
           atUser = user_info_list?.map(item => `<at user_id="${item?.id?.open_id}">${item?.name}</at>`)?.join(' ');
@@ -89,6 +109,8 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
           atUser = `<at user_id="${user_open_id}">${user_name}</at>`;
         }
 
+      } else {
+        return;
       }
     }
 
@@ -155,7 +177,7 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
       } else if (responseText.includes('骂一下')) {
         contentText = await getFenfang();
       } else {
-        console.log('source单聊，非固定格式调用，输入内容为：', responseText);
+        console.log('source单聊，非功能API格式调用，输入内容为：', responseText);
         // return;
         // 这里预计调用大模型
         // 先回一条占位消息
@@ -214,11 +236,20 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
         contentText = await getTiangou();
       } else if (responseText.includes('渣一下')) {
         contentText = await getZhanan();
-        console.log('contentText =', contentText);
       } else if (responseText.includes('骂一下')) {
         contentText = await getFenfang();
       } else {
-        console.log('source:群聊，非固定格式调用，输入内容为：', responseText);
+        console.log('source:群聊，非功能API格式调用，输入内容为：', responseText);
+
+        /** 没调用机器人，直接return */
+        // if(!responseText?.includes('@_user_1')) {
+        //   return ;
+        // }
+        if (mentions?.filter(item => item?.id?.open_id === TOOL_BOT_OPEN_ID)?.length === 0) {
+          console.log('没调用机器人，直接return');
+          return ;
+        }
+        
         // return;
         // 先回一条占位消息
         await client.im.v1.message.create({
@@ -238,7 +269,7 @@ const eventDispatcher = new Lark.EventDispatcher({}).register({
           data: {
             receive_id: chat_id,
             msg_type: "text",
-            content: JSON.stringify({ text: answer }),
+            content: JSON.stringify({ text: `${atUser} ${answer}` }),
           },
         });
       }
